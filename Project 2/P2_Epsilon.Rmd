@@ -1,0 +1,878 @@
+---
+title: "Epsilon"
+author: "Nishanth Gandhidoss, Raghavendar Shankar, Mitul Shah"
+date: "2 February 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r include=FALSE}
+# installing the packages
+# Function to Install packages
+# checks the available.packages before
+installNewPackage <- function(packageName) {
+        if(packageName  %in% rownames(installed.packages()) == FALSE)
+        {
+                install.packages(packageName, repos = "http://cran.us.r-project.org", dependencies=TRUE)
+        }
+}
+
+installNewPackage("lsr")
+
+library(lsr)
+```
+
+
+## Epsilon
+
+* Nishanth Gandhidoss  
+* Raghavendar Shankar
+* Mitul Shah
+
+
+#### Question 1
+
+(20 points) Write your own general-purpose functions to perform min-max normalization and z-score normalization (using standard deviation or mean absolute deviation). Do not just use functions available in R, Python or Matlab. Think about how to ensure it generalizes. For example, in R will it work on vectors, matrices and data frames. In Matlab, will it work on vectors and matrices. For min-max normalization, typically you want to scale to [0; 1] (defaults), but you should be able to pass in other limits.
+
+The function minmaxNorm should take four arguments
+
+* **trData**- the training data (use to establish the data properties for normalizaiton)
+* **teData**- the testing data (if supplied) to also be normalized according the the same data properties
+* **minV**- minimum value of new range
+* **maxV**- maximum value of new range
+
+The function zscoreNorm should take three arguments
+
+* **trData**- the training data (use to establish the data properties for normalizaiton)
+* **teData**- the testing data (if supplied) to also be normalized according the the same data properties
+* **madFlag**- boolean flag if positive use mean absolute deviation instead of standard deviation
+
+
+```{r question1(minmax)}
+# Check whether the two data is of same class
+isDataSameClass <- function(trData, teData) {
+    if((class(trData) != class(teData)) & !is.null(teData)) {
+        stop("Train and test data are of different class...")
+    }
+}
+
+# Check whether Max greater than Min
+isMaxVGreater <-  function(minV, maxV) {
+    if(minV > maxV)
+        stop("Maximum value argument should be larger than minimum value...")
+}
+
+# Create custome column names like V1, V2, etc
+prepColNames <- function(data) {
+    colname <- c()
+    for(i in 1:ncol(data)) {
+        colname <- c(colname, paste0("V", i))
+    }
+    colname
+}
+
+# Normalize train and test data in form vectors/column
+getNormalized <- function(trData, teData, minV, maxV, madFlag, method) {
+    
+    if(!is.null(teData)) {
+        if(!(is.numeric(trData)) | !is.numeric(teData)) {
+            stop("Data supplied are not in numeric format...")
+        }
+        if(anyNA(trData) | anyNA(teData)) {
+            stop("Your data contains NA...")
+        }
+    } else {
+        if(!is.numeric(trData)) {
+            stop("Data supplied are not in numeric format...")
+        }
+        if(anyNA(trData)) {
+            stop("Your data contains NA...")
+        }
+    }
+
+    trResult <- NULL
+    teResult <- NULL
+    result <- NULL
+    
+    if(method == "minmax") {
+        trMin <- min(trData)
+        trMax <- max(trData)
+        for(i in 1:length(trData)) {
+            trResult[i] <- (maxV - minV) / (trMax -  trMin) * (trData[i] - trMax) + maxV
+        }
+        if(!is.null(teData)) {
+            for(i in 1:length(teData)) {
+                teResult[[i]] <- (maxV - minV) / (trMax -  trMin) * (teData[i] - trMax) + maxV
+            }
+            result <- append(list(trResult), list(teResult))
+        } else {
+            result <- list(trResult)
+        }
+    } else if(method == "zscore"){
+        trMean <- mean(trData)
+        if(!madFlag) {
+            trSd <- sd(trData)
+            for(i in 1:length(trData)) {
+                trResult[i] <- (trData[i] - trMean) / trSd 
+            }
+            if(!is.null(teData)) {
+                for(i in 1:length(teData)) {
+                    teResult[[i]] <- (teData[i] - trMean) / trSd 
+                }
+                result <- append(list(trResult), list(teResult))
+            } else {
+                result <- list(trResult)
+            }
+        } else {
+            trMeanDev <- aad(trData)
+            for(i in 1:length(trData)) {
+                trResult[i] <- (trData[i] - trMean) / trMeanDev 
+            }
+            if(!is.null(teData)) {
+                for(i in 1:length(teData)) {
+                    teResult[[i]] <- (teData[i] - trMean) / trMeanDev 
+                }
+                result <- append(list(trResult), list(teResult))
+            } else {
+                result <- list(trResult)
+            }
+        }
+    }
+    result
+}
+
+# Normalize train and test dataframe
+getNormalizedDF <- function(trData, teData, minV, maxV, madFlag, method) {
+    trResultList <- list()
+    teResultList <- list()
+    for(i in 1:ncol(trData)) {
+        if(!is.null(teData)) {
+            scaled <- getNormalized(trData[, i], teData[, i], minV, maxV, madFlag, method)
+            teResultList[[i]] <- scaled[2]
+        } else {
+            scaled <- getNormalized(trData[, i], teData, minV, maxV, madFlag, method)
+        }
+        trResultList[[i]] <- scaled[1]
+    }
+    trResult <- data.frame(trResultList)
+    colnames(trResult) <- prepColNames(trResult)
+    if(is.null(teData)) {
+        result <- trResult
+    } else {
+        teResult <- data.frame(teResultList)
+        colnames(teResult) <- prepColNames(teResult)
+        result <- list(trResult, teResult)
+    }
+    result
+}
+
+# Function to compute Min Max Normalization
+minmaxNorm <- function(trData = NULL, teData = NULL, minV = NULL, maxV = NULL) {
+    if(!is.null(trData)) {
+        isDataSameClass(trData, teData)
+        isMaxVGreater(minV, maxV)
+        method <- "minmax"
+        if(is.vector(trData)) {
+            result <- getNormalized(trData, teData, minV, maxV, NULL, method)
+        } else if(is.data.frame(trData)) {
+            result <- getNormalizedDF(trData, teData, minV, maxV, NULL, method)
+        } else if(is.matrix(trData)) {
+            if(is.null(teData)) {
+                result <- getNormalizedDF(as.data.frame(trData), teData, minV, maxV, NULL, method)
+            } else {
+                result <- getNormalizedDF(as.data.frame(trData), 
+                                                as.data.frame(teData), minV, maxV, NULL, method)
+            }
+        }
+    } else {
+        stop("Train data is required and cannot be NULL...")
+    }
+    result
+}
+
+```
+
+
+```{r question1(zscore), warning=FALSE}
+# Function to compute zscore Normalization
+zscoreNorm <- function(trData = NULL, teData = NULL, madFlag = FALSE) {
+    if(!is.null(trData)) {
+        isDataSameClass(trData, teData)
+        method <- "zscore"
+        if(is.vector(trData)) {
+            result <- getNormalized(trData, teData, NULL, NULL, madFlag, method)
+        } else if(is.data.frame(trData)) {
+            result <- getNormalizedDF(trData, teData, NULL, NULL, madFlag, method)
+        } else if(is.matrix(trData)) {
+            if(is.null(teData)) {
+                result <- getNormalizedDF(as.data.frame(trData), teData, NULL, NULL, madFlag, method)
+            } else {
+                result <- getNormalizedDF(as.data.frame(trData), 
+                                                as.data.frame(teData), NULL, NULL, madFlag, method)
+            }
+        }
+    } else {
+        stop("Train data is required and cannot be NULL...")
+    }
+    result
+}
+
+```
+
+
+#### Question 2
+
+(8 points) Data Mining Book: 3.6(a-c)
+
+Report the normalized values in a table.
+
+
+```{r question2}
+dataFromBook <- c(200, 300, 400, 600,1000)
+minmaxNorm(dataFromBook, NULL, 0, 1)
+zscoreNorm(dataFromBook, NULL, FALSE)
+zscoreNorm(dataFromBook, NULL, TRUE)
+```
+
+
+
+#### Question 3
+
+Load the Iris data set available from the UCI Machine Learning data repository, http://archive.ics.uci.edu/ml/.
+
+Using the data for petal length, answer the following questions:
+
+#### Question 3 a
+
+(4 points) Use your min-max normalization function with a range [-1.0; 1.0], to what values would {1.95, 3.1, 5.68 and 6.2} transform?
+
+
+```{r question3a}
+# Reading the data 
+destfile <- "data/iris.csv"
+
+# checking whether the file already exists or not
+if(!file.exists(destfile)) {
+    iris <- read.csv(url("http://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data"), col.names = c("sepal.length", "sepal.width", "petal.length", "petal.width", "class"), header = F)
+    write.csv(iris, file = "data/iris.csv")
+} else {
+    iris <- read.csv("data/iris.csv", header = T)
+}
+
+dataQ3a <- c(1.95, 3.1, 5.68, 6.2)
+result <- minmaxNorm(iris$petal.length, dataQ3a, -1, 1)
+result
+```
+
+
+#### Question 3 b
+
+(4 points) Use your z-score normalization function to determine what values {1.95, 3.1, 5.68, and 6.2} would transform to?
+
+
+```{r question3b}
+result <- zscoreNorm(iris$petal.length, dataQ3a, TRUE)
+result
+```
+
+
+#### Question 3 c
+
+(2 points) Comment on which method is preferred for this data, and why?
+
+**For this data, it looks like z-score normalization will be best method to apply on because z-value here would tell us about how many standard deviationns away from the mean the value is. This can be helpful to detectthe outliera by choosing the cut off value we want to choose. But generally, if the value is 3.5 standard deviation away from the mean, we say that it is an outlier.**
+
+
+#### Question 4
+
+Consider the following data set of with 5 samples and 3 variables:
+
+|   |  A  |  B  |  C  |
+|---|-----|-----|-----|
+| x1| 1.4 | 1.3 | 2.9 |
+| x2| 1.8 | 1.4 | 3.2 |
+| x3| 1.3 | 1.2 | 2.9 |
+| x4| 0.9 | 3.5 | 3.1 |
+| x5| 1.5 | 2.1 | 3.3 |
+
+```{r}
+A <- c(1.4,1.8,1.3,0.9,1.5)
+B <- c(1.3,1.4,1.2,3.5,2.1)
+C <- c(2.9,3.2,2.9,3.1,3.3)
+
+dat <- cbind.data.frame(A,B,C)
+
+rownames(dat) <- c("x1","x2","x3","x4","x5")
+dat
+```
+
+You have a new data point x = (1:25; 1:78; 3:01).
+```{r}
+x <- rbind.data.frame(c(1.25,1.78,3.01))
+```
+
+
+#### Question 4 a
+
+(5 points) Calculate and present the distance between the new data point and each of the points in the data set using Manhattan distance, Euclidean distance, Minkowski distance ( = 3), supremum distance, and cosine similarity.
+
+
+```{r Manhattan Distance}
+# Function to compute Manhattan Distance
+manhattanDist <- function(data1,data2){
+    temp <- rep(0,5)
+    for(i in 1:nrow(data1)){
+        temp1 <- rep(0,3)
+        for(j in 1:ncol(data2)){
+            temp1[j] <- abs(data1[i,j] - data2[1,j])
+        }
+        temp[i] <- sum(temp1)
+    }
+    return(temp)
+}
+
+result <- manhattanDist(dat,x)
+manhattanRes <- data.frame(matrix(data = result,nrow = 5,ncol = 1,byrow = T),row.names = c("x1","x2","x3","x4","x5"))
+colnames(manhattanRes) <- c("x(Manhattan Distance)")
+
+manhattanRes
+```
+
+
+```{r Euclidean Distance}
+# Function to compute Euclidean Distance
+euclideanDist <- function(data1,data2){
+    temp <- rep(0,5)
+    for(i in 1:nrow(data1)){
+        temp1 <- rep(0,3)
+        for(j in 1:ncol(data2)){
+            temp1[j] <- (data1[i,j] - data2[1,j])^2
+        }
+        temp[i] <- sqrt(sum(temp1))
+    }
+    return(temp)
+}
+
+result <- euclideanDist(dat,x)
+euclideanRes <- data.frame(matrix(data = result,nrow = 5,ncol = 1,byrow = T),row.names = c("x1","x2","x3","x4","x5"))
+colnames(euclideanRes) <- c("x(Euclidean Distance)")
+
+euclideanRes
+```
+
+
+```{r Minkowski Distance}
+# Function to compute Minkowski distance
+minkowskiDist <- function(data1,data2,lambda){
+    temp <- rep(0,5)
+    for(i in 1:nrow(data1)){
+        temp1 <- rep(0,3)
+        for(j in 1:ncol(data2)){
+            temp1[j] <- (abs(data1[i,j] - data2[1,j]))^lambda
+        }
+        temp[i] <- (sum(temp1))^(1/lambda)
+    }
+    return(temp)
+}
+result <- minkowskiDist(dat,x,lambda = 3)
+minkowskiRes <- data.frame(matrix(data = result,nrow = 5,ncol = 1,byrow = T),row.names = c("x1","x2","x3","x4","x5"))
+colnames(minkowskiRes) <- c("x(Minkowski Distance)")
+
+minkowskiRes
+```
+
+
+```{r Supremum Distance}
+# Function to compute supremum distance
+supremumDist <- function(data1,data2){
+    temp <- rep(0,5)
+    for(i in 1:nrow(data1)){
+        temp1 <- rep(0,3)
+        for(j in 1:ncol(data2)){
+            temp1[j] <- abs(data1[i,j] - data2[1,j])
+        }
+        temp[i] <- max(temp1)
+    }
+    return(temp)
+}
+
+result <- supremumDist(dat,x)
+supremumRes <- data.frame(matrix(data = result,nrow = 5,ncol = 1,byrow = T),row.names = c("x1","x2","x3","x4","x5"))
+colnames(supremumRes) <- c("x(Supremum Distance)")
+
+supremumRes
+```
+
+
+```{r Cosine Similarity}
+#Cosine Similarity
+cosineSimilarity <- function(data1,data2){
+    temp <- rep(0,5)
+    for (i in 1:5){
+        vector1 = data1[i,]
+        vector2 = data2[1,]
+        temp[i] <- sum(vector1*vector2)/sqrt(sum(vector1^2)*sum(vector2^2))
+    
+    }
+    return(temp)
+}
+
+result <- cosineSimilarity(dat,x)
+cosineRes <- data.frame(matrix(data = result,nrow = 5,ncol = 1,byrow = T),row.names = c("x1","x2","x3","x4","x5"))
+colnames(cosineRes) <- c("x(Cosine Similarity)")
+
+cosineRes
+```
+
+
+#### Question 4 b
+
+(5 points) Normalize the data using min-max normalization to be between 0 and 1. What is the Euclidean distance between the new data point and x1; : : : ; x5.
+
+
+```{r question4b}
+#min-max normalization for the data
+dat1 <- data.frame(minmaxNorm(dat,NULL,0,1))
+dat1
+```
+
+```{r}
+# Euclidean Distance
+result <- euclideanDist(dat1,x)
+euclideanRes <- data.frame(matrix(data = result,nrow = 5,ncol = 1,byrow = T),row.names = c("x1","x2","x3","x4","x5"))
+colnames(euclideanRes) <- c("x")
+
+euclideanRes
+```
+
+
+#### Question 5
+
+**K-means Clustering**
+
+Perform k-means clustering manually with k=2 on the example data given below of n = 8 samples over p = 2 features.
+
+| Sample | X1 | X2 | Initial Groups |
+|--------|----|----|----------------|
+|    1   |  1 |  4 |       1        |
+|    2   |  1 |  3 |       1        |
+|    3   |  0 |  4 |       2        |
+|    4   |  2 |  5 |       2        |
+|    5   |  5 |  1 |       1        |
+|    6   |  6 |  2 |       2        |
+|    7   |  4 |  0 |       1        |
+|    8   |  5 |  2 |       2        |
+
+
+#### Question 5 a
+
+(2 points) Plot the sample data.
+
+
+```{r question 5a, fig.height=4, fig.width=4}
+## Loading the required libraries
+library(magrittr)
+library(dplyr)
+
+## Creating the dataset
+data <- data.frame(c(1,1,0,2,5,6,4,5), c(4,3,4,5,1,2,0,2), c(1,1,2,2,1,2,1,2))
+
+## Naming the columns
+colnames(data) <- c("x1", "x2", "group")
+
+## Plotting sample data
+plot(data$x1, data$x2, cex = 1, pch = 19, main = "Sample data", xlab = "x1", ylab = "x2")
+
+
+
+```
+
+
+#### Question 5 b
+
+(4 points) Assign samples to be the initial groupings given in the table. Compute and report the centroid for each cluster.
+
+```{r question 5b, fig.height=4, fig.width=4}
+## Initial Plot with the points assigned to the given groups
+names = c("1", "2", "3", "4", "5", "6", "7", "8")
+plot(data[,1:2], col = data$group, cex = 1, main = "Initial Condition", pch = 19)
+text(data$x1+0.20, data$x2, labels=names)
+
+## Computing the initial centroids
+dist <- as.data.frame(data %>% group_by(group) %>% summarise(x1 = mean(x1), x2 = mean(x2)))
+
+## Matrix showing the initial centroids
+centers.init <- as.matrix(dist[, 2:3])
+
+## Initial Centroids
+centers.init
+
+```
+
+The initial Centroid can be computed as follows:
+
+C1 = ((1+1+5+4)/4, (4+3+1+0)/4)
+C2 = ((0+2+6+5)/4, (4+5+2+2)/4)
+
+Thus, 
+C1 = (11/4, 2) or (2.75, 2)
+C2 = (13/4, 13/4) or (3.25, 3.25)
+
+#### Question 5 c
+
+(4 points) Assign each sample to the centroid to which it is closest (Euclidean distance). Report the cluster labels for each observation.
+
+Here, we calculate the distance of each point from both the Centroids. Then, we assign the point to the Group to which it is closer to. These are the labels of each of the points after the 1st iteration. 
+
+```{r question 5c, fig.height=4, fig.width=4}
+## Computing distance of points from both the Centroids
+data$distance.from.C1 <- c(2.66, 2.02, 3.4, 3.09, 2.46, 3.25, 2.36, 2.25)
+data$distance.from.C2 <- c(2.37, 2.26, 3.34, 2.15, 2.85, 3.02, 3.34, 2.15)
+
+## Assigning the groups according to the closest Centroid
+data$group <- c(2,1,2,2,1,2,1,2)
+
+## Printing the data
+data
+
+```
+
+We see that now there are 5 points in Cluster 2 and only 3 points in cluster 1. 
+
+#### Question 5 d
+
+(20 points) Repeat (b) and (c) until the clusters remain stable.
+
+
+```{r question 5d, fig.height=4, fig.width=4}
+## Computing the centroids again
+dist <- data %>% group_by(group) %>% summarise(x1 = mean(x1), x2 = mean(x2))
+
+## Matrix showing the centroids now
+centers.init <- as.matrix(dist[, 2:3])
+
+## Centroids
+centers.init
+
+```
+
+Now, we see that the Centroids are (3.33, 1.33) and (2.8, 3.4)
+
+```{r  Computing the distances from the Centroids, fig.height=4, fig.width=4}
+## Computing the distances from the Centroids again
+data$distance.from.C1 <- c(3.54, 2.87, 4.27, 3.90, 1.70, 2.75, 1.49, 1.80)
+data$distance.from.C2 <- c(1.90, 1.84, 2.86, 1.79, 3.26, 3.50, 3.61, 2.61)
+
+## Assigning the groups according to the closest Centroid
+data$group <- c(2,2,2,2,1,1,1,1)
+
+## Printing the data
+data
+
+```
+
+
+Now, let's compute the Centroid again.
+
+```{r  Computing the distances from the Centroids again, fig.height=4, fig.width=4}
+## Computing the centroids again
+dist <- data %>% group_by(group) %>% summarise(x1 = mean(x1), x2 = mean(x2))
+
+## Matrix showing the centroids now
+centers.init <- as.matrix(dist[, 2:3])
+
+## Centroids
+centers.init
+```
+
+Now, the Centroids are (5, 1.25) and (1,4)
+
+Let's compute the distances from both the Centroids for each point now.
+
+```{r Computing the distances from both Centroids again, fig.height=4, fig.width=4}
+
+## Computing the distances from the Centroids again
+data$distance.from.C1 <- c(4.85, 4.37, 5.71, 4.8, 0.25, 1.25, 1.6, 0.75)
+data$distance.from.C2 <- c(0, 1, 1, 1.41, 5, 5.39, 5, 4.47)
+
+## Assigning the groups according to the closest Centroid
+data$group <- c(2,2,2,2,1,1,1,1)
+
+## Printing the data
+data
+
+```
+
+The assignments of the points remain the same now. Thus, the clusters will now remain stable.
+
+#### Question 5 e
+
+(2 points) Plot the sample data colored by cluster labeling and adding centroid points.
+
+
+We have created our own kMeans function here and plotted all the iterations.
+
+
+```{r question 5e, fig.height=4, fig.width=4}
+## Creating the dataset again
+data <- data.frame(c(1,1,0,2,5,6,4,5), c(4,3,4,5,1,2,0,2), c(1,1,2,2,1,2,1,2))
+
+## Naming the columns
+colnames(data) <- c("x1", "x2", "group")
+
+## Initial Centroid
+centers.init <- matrix(c(2.75, 2.00, 3.25, 3.25), nrow = 2, byrow = T)
+colnames(centers.init) <- c("x1", "x2")
+
+## Function to calculate the Euclidean distance between each point in the dataset to each centroid
+myEuclid <- function(points1, points2) {
+    distanceMatrix <- matrix(NA, nrow=dim(points1)[1], ncol=dim(points2)[1])
+    for(i in 1:nrow(points2)) {
+        distanceMatrix[,i] <- sqrt(rowSums(t(t(points1)-points2[i,])^2))
+    }
+    distanceMatrix
+}
+
+## Data points matrix
+data_points_m <- as.matrix(data[,1:2])
+
+## k-means Function
+myKmeans <- function(x, centers, distFun, nItter = 5) {
+    clusterHistory <- vector(nItter, mode="list")
+    centerHistory <- vector(nItter, mode="list")
+
+    for(i in 1:nItter) {
+        distsToCenters <- distFun(x, centers)
+        clusters <- apply(distsToCenters, 1, which.min)
+        centers <- apply(x, 2, tapply, clusters, mean)
+        # Saving history
+        clusterHistory[[i]] <- clusters
+        centerHistory[[i]] <- centers
+    }
+
+    list(clusters=clusterHistory, centers=centerHistory)
+}
+
+## Applying kMeans on the given points using Euclidean distance
+result <- myKmeans(data_points_m, centers.init, myEuclid)
+
+## Looking at the result
+result
+
+#### Plots showing the iterations of kMeans
+
+## Initial Plot with the points assigned to the given groups and their Centroid
+plot(data[,1:2], col = data$group, cex = 1, main = "Initial Condition with the Centroids", pch = 19)
+text(data$x1+0.20, data$x2, labels=names)
+points(centers.init, pch=19, cex=3, col = c("black", "red"))
+
+## Plots showing the iterations of the kMeans Clustering
+for(i in 1:3) {
+    plot(data_points_m, col = result$clusters[[i]], main=paste("Iteration:", i), xlab="x1", ylab="x2", pch = 19)
+  text(data$x1+0.20, data$x2, labels=names)
+    points(result$centers[[i]], cex=3, pch=19, col=1:nrow(result$centers[[i]]))
+}
+
+```
+
+We see that iterations 2 and 3 here are the same and the clusters are stable at (5, 1.25) and (1, 4) now. 
+
+#### Question 6
+
+**Hierarchical Clustering**
+
+Suppose you have 5 samples, for which the dissimilarity matrix is shown below:
+???
+
+$$
+D = \left(\begin{array}{cc} 
+-- & 0.3 & 0.4 & 0.7 & 0.6\\
+0.3 & -- & 0.5 & 0.45 & 0.4\\
+0.7 & 0.8 & 0.45 & -- & 0.35\\
+0.6 & 0.2 & 0.4 & 0.35 & --
+\end{array}\right)
+$$ 
+
+That is, the distance between the first and second sample is 0.3; the distance between the first and fourth sample is 0.7.
+
+
+#### Question 6 a
+
+(12 points) Trace running through hierarchical clustering manually with complete link- age and sketch the dendrogram. Estimate the heights in the dendrogram from the dissimilarity distances.
+
+
+The given dissimilarity matrix is as follows:
+
+|    | 1   |  2  | 3   | 4    | 5 |
+|----|-----|-----|-----|------|---|
+|  1 |  -  |     |     |      |   |
+|  2 | 0.3 | -   |     |      |   |
+|  3 | 0.4 | 0.5 | -   |      |   |
+|  4 | 0.7 | 0.8 | 0.45|   -  | - |
+|  5 | 0.6 | 0.2 | 0.4 | 0.35 | - |
+
+We see that the samples 2 and 5 are nearest to each other (distance of 0.2). So we merge them first. 0.2 is the height when we merge them in the dendogram. 
+
+So now we have 2 and 5 as a cluster. So our dissimilarity matrix now becomes as follws:
+
+|    | 1   | 25  | 3   | 4  |
+|----|-----|-----|-----|----|
+|  1 |  -  |     |     |    |
+| 25 | 0.6 | -   |     |    |
+|  3 | 0.4 | 0.5 | -   |    |
+|  4 | 0.7 | 0.8 | 0.45| -  |
+
+Note that we took the distance between point 1 and cluster of 2,5 as 0.6 which is maximum of distance between point 1,2 and point 1,5 as we are using Complete Linkage. Similarly we can calculate other distances.
+
+Now, we merge points 1 and 3 and the height here is 0.4.
+
+Now, our dissimilarity matrix becomes as follows:
+
+|    |  13 | 25  | 4 |
+|----|-----|-----|---|
+| 13 |  -  |     |   |
+| 25 | 0.6 | -   |   |
+|  4 | 0.7 | 0.8 | - |
+
+Now, we merge clusters 1,3 and clusters 2,5 and here the height of the dendogram is 0.6. 
+
+After merging, our dissimilarity matrix becomes as follows:
+
+|      |  1325  | 4 |
+|------|--------|---|
+| 1325 |  -     |   |
+|  4   |  0.8   | - |
+
+Now, only sample 4 is left out. So we can merge cluster 1,3,2,5 with the sample 4. Here the height is equal to 0.8.
+
+We have used R just to plot the dendogram.
+
+
+```{r question 6a}
+## Dissimilarity Matrix
+d <- matrix(c(0, 0.3, 0.4, 0.7, 0.6, 0.3, 0, 0.5, 0.8, 0.2, 0.4, 0.5, 0, 0.45, 0.4, 0.7, 0.8, 0.45, 0, 0.35, 0.6, 0.2, 0.4, 0.35, 0), nrow = 5, byrow = T)
+
+## Changing the class of dissimilarity matrix to distance
+d <- as.dist(d)
+
+## Hierarchical clustering using Complete linkage
+tree.single = hclust(d, method="complete")
+
+## Plotting the Dendogram
+plot(tree.single,hang=-1e-10, main="Dendogram (Complete linkage)", xlab="")
+
+```
+
+#### Question 6 b
+
+(12 points) Repeat (a), with single linkage clustering
+
+The given dissimilarity matrix is as follows:
+
+|    | 1   |  2  | 3   | 4    | 5 |
+|----|-----|-----|-----|------|---|
+|  1 |  -  |     |     |      |   |
+|  2 | 0.3 | -   |     |      |   |
+|  3 | 0.4 | 0.5 | -   |      |   |
+|  4 | 0.7 | 0.8 | 0.45|   -  | - |
+|  5 | 0.6 | 0.2 | 0.4 | 0.35 | - |
+
+Now, we merge points 2 and 5 as they are closest to each other. Their height when we merge them in the dendogram is 0.2.
+
+After merging points 2 and 5, our dissimilarity matrix becomes as follows:
+
+|    | 1   | 25   |  3   | 4  |
+|----|-----|------|------|----|
+|  1 |  -  |      |      |    |
+| 25 | 0.3 |  -   |      |    |
+|  3 | 0.4 | 0.4  |  -   |    |
+|  4 | 0.7 | 0.35 | 0.45 | -  |
+
+Note that now we used the minimum distance between points 1,2 and points 1,5 as the distance between the cluster 25 and point 1. 
+
+Now, we merge cluster 2,5 and the point 1. The height here is 0.3.
+
+So, our dissimilarity matrix now becomes as follows:
+
+|     |  125 |  3   | 4 |
+|-----|------|------|---|
+| 125 |   -  |      |   |
+|  3  | 0.4  |  -   |   |
+|  4  | 0.35 | 0.45 | - |
+
+Now we have points 1,2,5 in a single cluster. We now merge cluster 1,2,5 with the point 4 with the height of 0.35 in the dendogram. 
+
+So our dissimilarity matrix becomes as follows:
+
+|      |  1245  | 3 |
+|------|--------|---|
+| 1245 |  -     |   |
+|  3   |  0.4   | - |
+
+Now, we merge cluster 1,2,4,5 with the point 3 with the height of 0.4 in the dendogram. 
+
+The dendogram is shown as follows:
+
+```{r question 6b}
+## Hierarchical clustering using Single linkage
+tree.single = hclust(d, method="single")
+
+## Plotting the Dendogram
+plot(tree.single,hang=-1e-10, main="Dendogram (Single linkage)", xlab="")
+```
+
+
+#### Question 6 c
+
+(6 points) Use the dendrogram from (a) and (b), cut the dendrograms to form three clusters. Which samples are in each cluster?
+
+
+```{r question 6c}
+## Hierarchical clustering using Complete linkage
+tree.single = hclust(d, method="complete")
+
+## Plotting the Dendogram
+plot(tree.single,hang=-1e-10, main="Dendogram (Complete linkage)", xlab="")
+abline(h=0.45, lty=3, lwd=2)
+
+```
+
+Here, if we form 3 clusters, we get the following samples in each cluster:
+
+Cluster 1: Sample points 1,3
+
+Cluster 2: Sample points 2,5
+
+Cluster 3: Sample point 4
+
+
+
+### Single Linkage:
+
+```{r single linkage}
+## Hierarchical clustering using Single linkage
+tree.single = hclust(d, method="single")
+
+## Plotting the Dendogram
+plot(tree.single,hang=-1e-10, main="Dendogram (Single linkage)", xlab="")
+abline(h=0.325, lty=3, lwd=2)
+
+```
+
+
+Here, if we form 3 clusters, we get the following samples in each cluster:
+
+Cluster 1: Sample points 1,2,5
+
+Cluster 2: Sample point 4
+
+Cluster 3: Sample point 3
+
+
+
+
+**End of assignemnt**
