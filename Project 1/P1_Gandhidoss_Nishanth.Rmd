@@ -1,0 +1,755 @@
+---
+title: "Project 1 - CS4821 Data Mining"
+author: "Nishanth Gandhidoss"
+date: "23 January 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+
+```{r include=FALSE}
+# installing the packages
+# Function to Install packages
+# checks the available.packages before
+installNewPackage <- function(packageName) {
+        if(packageName  %in% rownames(installed.packages()) == FALSE)
+        {
+                install.packages(packageName, repos = "http://cran.us.r-project.org", dependencies=TRUE)
+        }
+}
+
+installNewPackage("ggplot2")
+installNewPackage("GGally")
+installNewPackage("prepdat")
+installNewPackage("DAAG")
+installNewPackage("dplyr")
+installNewPackage("plotly")
+
+# loading the packages
+library(ggplot2)
+library(GGally)
+library(prepdat)
+library(DAAG)
+library(dplyr)
+library(plotly)
+```
+
+
+## Question 1
+
+(4 points) From your reading of Ch. 1 of the text book, in your own words, what is the difference between classification and regression? How are they similar?
+
+### **Classification and Regression**
+
+* Classification is a predictive methodology used to distinguish a sample of observations to which classes or label they belong to. It is used generally predict categorical labels which are predominantly ordered or unordered.
+
+* Regression is also a prediction technique which is used to identify the correlation or trend relationship between dependent and independent variables. Generally, it best works for and most often used for continuous data. 
+
+* Classification and regression, both are supervised learning techniques where the outcomes are used to build the model. And the model used to make the prediction for other datasets.
+
+
+## Question 2
+
+### Census Data
+
+Consider the [Census Income](http://archive.ics.uci.edu/ml/datasets/Census+Income) data set available at the UCI ML archive. Specifically, you will be interested in the adult.data file which contains the data and adult.names files which contains documentation about the data.
+
+You should explore the files a bit in a text editor to understand the format. Then load the data for you analysis, the first samples of the data set should be:
+
+<p style="margin-left:30px;">39, State-gov, 77516, Bachelors, 13, Never-married, Adm-clerical, Not-in-family, White, Male, 2174, 0, 40, United-States, <=50K</p>
+
+The variables are made up of different types: numeric, nominal, etc. Answer the following
+questions:
+
+#### Question 2 (a) 
+
+(14 points) **Variable Definitions** 
+
+For each variable (column of the data set) excluding the final target variable (last column), write a clear 1-sentence description of what the variable is, i.e., what information does it describe and how is it defined collected.
+
+To answer this question, you may have to do a bit of reading and research into this data set. If you can not find a clear explanation of what a variable is and how it is defined say so.
+
+For example, the variable "Age" could be described as, "AGE is the age of an individual as reported by that person for the 1990 census; the value is reported in integer units of years."
+
+
+```{r question2a}
+# Reading the data 
+destfile <- "data/census_data.csv"
+
+# checking whether the file already exists or not
+if(!file.exists(destfile)) {
+    census_data <- read.csv(url("http://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data"), col.names = c("age", "workclass", "fnlwgt", "education", "education-num", "marital-status", "occupation", "relationship", "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country", "salary"), header = F)
+    write.csv(census_data, file = "data/census_data.csv")
+} else {
+    census_data <- read.csv("data/census_data.csv", header = T)
+}
+```
+
+**Age**: age of the person reported by each individual recorded for 1990 census in integer units of years as a continuous variable.
+
+**Workclass**: represents the various category of what kind of work a particular individual is doing at the time of taking the census. It is a categorical with Private, Self-emp-not-inc, Self-emp-inc, Federal-gov, Local-gov, State-gov, Without-pay and Never-worked as labels.
+
+**fnlwgt**: Final sampling weight is a continuous variable that is the inverse of sampling fraction adjusted for non-response and over or under sampling of particular groups.
+
+**Education**: categorical variable describing the maximum qualification of an individual. Bachelors, Some-college, 11th, HS-grad, Prof-school, Assoc-acdm, Assoc-voc, 9th, 7th-8th, 12th, Masters, 1st-4th, 10th, Doctorate, 5th-6th, Preschool.
+
+**Education-num**: It is an column of integers represents each and every category of the education column.
+
+**Marital-status**: categorical variable tells what is the marital status of the individual. Married-civ-spouse, Divorced, Never-married, Separated, Widowed, Married-spouse-absent, Married-AF-spouse.
+
+**Occupation**: categorical variable which tells what is kind of work they were doing at time of census. Tech-support, Craft-repair, Other-service, Sales, Exec-managerial, Prof-specialty, Handlers-cleaners, Machine-op-inspct, Adm-clerical, Farming-fishing, Transport-moving, Priv-house-serv, Protective-serv, Armed-Forces.
+
+**Relationship**: current relationship status as a categorical variable. Wife, Own-child, Husband, Not-in-family, Other-relative, Unmarried.
+
+**Race**: categorical variable which defines the race of the individual pesrons who gave the reply for the census study. White, Asian-Pac-Islander, Amer-Indian-Eskimo, Other, Black.
+
+**Sex**: categorical variable which describes the gender of the each observation on the census data. Female, Male.
+
+**capital-gain**: is a continuous variable which describes an increase in the value of a capital asset that gives it a higher worth than the purchase price. 
+
+**capital-loss**: is a continuous variable which describes an .
+
+**hours-per-week**: continuous variable which describes how many hours a person is working per week.
+
+**native-country**: categorical variable which says the native country of the each individuals. United-States, Cambodia, England, Puerto-Rico, Canada, Germany, Outlying-US(Guam-USVI-etc), India, Japan, Greece, South, China, Cuba, Iran, Honduras, Philippines, Italy, Poland, Jamaica, Vietnam, Mexico, Portugal, Ireland, France, Dominican-Republic, Laos, Ecuador, Taiwan, Haiti, Columbia, Hungary, Guatemala, Nicaragua, Scotland, Thailand, Yugoslavia, El-Salvador, Trinadad&Tobago, Peru, Hong, Holand-Netherlands.
+
+**Salary**: categorical variable saying whether the salary of the person is greater than or equal to or less than 50k dollars.
+
+#### Question 2 (b)
+
+**Missing Data** 
+
+The symbol "?" indicates missing values in the data.
+
+i. (7 points) For each variable, calculate and report the percentage of missing data for that variables (percentage of rows)
+
+Ignore missing values for the remainder of the question.
+
+
+```{r question2b}
+# The data frame has " ?" as missing data where there is a 
+# whitespace before the question mark. So we have to trim the data
+census_data <- data.frame(lapply(census_data, trimws))
+
+census_data_wo_missing <- census_data
+
+# fucntion to calculate percentage of missing data
+percentage_of_rows <- function(colname) {
+    count <- nrow(census_data[census_data[colname] == "?", ])    
+    perc_of_rows <- (count / nrow(census_data[colname])) * 100
+    round(perc_of_rows, 2)
+}
+
+# looping through each column names 
+for(colname in colnames(census_data)) {
+    perc_of_rows <- percentage_of_rows(colname)
+    if(perc_of_rows != 0) {
+        print(paste(toupper(colname), "missing value percentage is", 
+                    percentage_of_rows(colname), sep = " "))
+    } else {
+        print(paste(toupper(colname), "doesn't have any missing values", sep = " "))
+    }
+    # Removing the missing values
+    census_data_wo_missing <- census_data_wo_missing[census_data_wo_missing[colname] != "?", ]
+}
+
+# First 6 rows of the data frame without missing values
+head(census_data_wo_missing)
+```
+
+
+#### Question 2 (c)
+
+(7 points) **Variable Types** 
+
+Which of the variables are numerics and which are categorical? (Use column names)
+
+**Numeric Data Variables** 
+
+* Age
+* fnlwgt
+* Capital.gain
+* Capital.loss
+* Hours.per.week
+
+
+**Categorical Data Variables**
+
+* Workclass
+* Education
+* Education.num
+* Marital.status
+* Occupation
+* Relationship
+* Race
+* Sex
+* Native.country
+* Salary
+
+```{r question2c}
+str(census_data_wo_missing)
+
+# Since all of the numerical data are in as 
+# factors we need convert those to numeric
+census_data_wo_missing[, c("age", "fnlwgt", "capital.gain", "capital.loss", "hours.per.week")] <- 
+    sapply(census_data_wo_missing[, c("age", "fnlwgt", "capital.gain", "capital.loss", "hours.per.week")] , 
+           as.numeric)
+
+# looking at data again
+str(census_data_wo_missing)
+```
+
+
+#### Question 2 (d)
+
+**Numeric Data** 
+
+Select two of the numeric variables, answer the following questions.
+
+i. (4 points) Explore the number of unique values the variable has.
+
+* For a variable with less than 50 values, generate a histogram where each bin corresponds to one of the variable's values.
+
+* For a variable with 50 or more values, generate a histogram using 100 bins (the bin placement will be done automatically, via the program).
+
+I am choosing the following two variables
+
+* Age
+* Hours.per.week
+
+```{r question2d-i}
+# custom function to create the histogram
+histogram <- function(data, colname) {
+    no_of_unique <- nrow(unique(census_data_wo_missing[tolower(colname)]))
+    g <- ggplot(census_data_wo_missing, aes(x = data)) + 
+                xlab(colname) +
+                ggtitle(paste("Histogram of", colname, sep = " ")) +
+                theme(plot.title = element_text(hjust = 0.5))
+    if(no_of_unique < 50) {
+        g + geom_histogram(bins = no_of_unique)
+    }
+    else if (no_of_unique >=50){
+        g + geom_histogram(bins = 50)
+    }
+    
+}
+
+histogram(census_data_wo_missing$age, "Age")
+histogram(census_data_wo_missing$hours.per.week, "Hours.per.week")
+```
+
+
+ii. (4 points) For each of the two variables, create 2 histograms as part of the same figure (stacked side-by-side or one on top of another). In one histogram, only consider data samples with the class variable is "> 50k"; in the other, only consider data samples where the class variables is "<= 50k".
+
+```{r question2d-ii}
+# custom function to print stacked  
+# histogram based on salary
+stacked_hist <- function(data, colname) {
+    ggplot(census_data_wo_missing, aes(x = data, fill = salary)) +
+        xlab(colname) +
+        ggtitle(paste("Stacked Histogram of", colname, sep = " ")) +
+        theme(plot.title = element_text(hjust = 0.5)) +
+        geom_bar() # defaults to stacking    
+}
+
+stacked_hist(census_data_wo_missing$age, "Age")
+stacked_hist(census_data_wo_missing$hours.per.week, "Hours per week")
+```
+
+
+iii. (4 points) For each of the two variables, generate a figure with 2 boxplots side-by-side, with the two boxplots corresponding to samples for the two classes: "<= 50k" and "> 50k".
+
+```{r question2d-iii}
+# custom function to print stacked  
+# boxplot based on salary
+stacked_boxplot <- function(data, colname) {
+    ggplot(census_data_wo_missing, aes(x = salary, y = data)) +
+        ylab(colname) +
+        ggtitle(paste("Boxplot of", colname, sep = " ")) +
+        theme(plot.title = element_text(hjust = 0.5)) +
+        geom_boxplot() # defaults to stacking    
+}
+
+stacked_boxplot(census_data_wo_missing$age, "Age")
+stacked_boxplot(census_data_wo_missing$hours.per.week, "Hours per week")
+```
+
+
+iv. (6 points) Describe what the plots have revealed about the data (2-4 sentences).
+
+- It looks like majority of the people in census population data have been in the age between 10 to 30. But if compare those by taking the salary category into account, then it's evident that second and third quartile of <= 50k salary is 8 to 10 years higher.
+- And there is very less number of people aged more than 60. Most of the people work for around 35 hours per week. 
+- On comparision of salary along the differrent age, there are large number of people who has salary less than 50k compared to those with more than 50k. And its prevails same in comparsion of salary along with hours per week.
+
+
+#### Question 2 (e)
+
+**Categorical Data** 
+
+For two of the categorical variables (not including the class variable, last column), answer the following questions.
+
+I am choosing the following two variables
+
+* Sex
+* Race
+
+i. (4 points) For each of the two variables, generate a bar plot, where each bar corresponds to the number of unique values. Include, missing values as a possible value in the plot.
+
+```{r question2e-i}
+# custom function to print stacked  
+# barplot based on salary
+bar_plot <- function(data, colname) {
+    ggplot(census_data_wo_missing, aes(x = data)) +
+        xlab(colname) +
+        ggtitle(paste("Barplot of", colname, sep = " ")) +
+        theme(plot.title = element_text(hjust = 0.5)) +
+        geom_bar() # defaults to stacking      
+}
+bar_plot(census_data_wo_missing$sex, "Sex")
+bar_plot(census_data_wo_missing$race, "Race")
+```
+
+
+ii. (4 points) For each of the two variables, create 2 bar plots in a single figure (stacked one on top of the other). The top bar plot is for the data with the class "<= 50k" and the bottom plot is for data with the class "> 50k".
+
+```{r question2e-ii}
+# custom function to print stacked  
+# barplot based on salary
+Stacked_barplot <- function(data, colname) {
+    ggplot(census_data_wo_missing, aes(x = data, fill = salary)) +
+        xlab(colname) +
+        ggtitle(paste("Stacked barplot of", colname, sep = " ")) +
+        theme(plot.title = element_text(hjust = 0.5)) +
+        geom_bar() # defaults to stacking      
+}
+Stacked_barplot(census_data_wo_missing$sex, "Sex")
+Stacked_barplot(census_data_wo_missing$race, "Race")
+```
+
+
+iii. (6 points) Describe what the plots have revealed about the data (2-4 sentences).
+
+- It looks like there are more number of Male than Female in the dataset. People with salary less than 50k are more in both Male and female with Female population having more percent of less than 50k salary commpared to Male.
+
+- When taking distribution of race of the people, there are lot of number of white people who have large percent of people with salary >50k. And at the same time, Black people being second on the list with number of people in the dataset, have very less percent of people with salary >50k.
+
+
+#### Question 2 (f)
+
+**Pairwise Analysis:**
+
+i. (5 points) Pick a categorical variable, then explore how the variable changes with "Age". Explore whether the variable you select appears to depend on age, or whether it is independent of age. Clearly indicate what evidence there is to support your conclusion.
+
+Here I am picking **Sex** as the categorical variable which I am going to explore it with age First lets see the graph.
+
+```{r question2f-i}
+# custome fuction to do pairwise analysis
+# from the graph
+pairwise <- function(colValues1, colValues2, label1, label2) {
+        pairs(cbind(as.numeric(colValues1), as.numeric(colValues2)), 
+              labels = c(label1, label2),
+              main = paste(label1, label2, sep = " VS "), pch = 15, col = "red")
+        print(cor(as.numeric(colValues1), colValues2))
+}
+pairwise(census_data_wo_missing$sex, census_data_wo_missing$age,
+         "Sex", "Age")
+
+# Prepare some data
+df <- census_data_wo_missing[, c(1, 10)]
+df$sex <- as.numeric(df$sex)
+# Correlation plot
+ggcorr(df, palette = "RdBu", label = TRUE)
+```
+
+
+
+**From the above two graph, we can say that there no dependancy between age and sex. From the first graph, there is not much significant relationship between sex and age and also second graph which showing the correlation between them as 0.1 which is very less. Correlation is higher if value is much away from 0.**
+
+ii. (5 points) Pick any two numeric variables, and explore whether or not they depend on each other, i.e., are they independent or not? Clearly indicate what evidence there is to support your conclusion.
+
+```{r question2f-ii}
+pairwise(census_data_wo_missing$age, census_data_wo_missing$hours.per.week,
+         "Age", "Hours per week")
+
+# Prepare some data
+df <- census_data_wo_missing[, c(1, 13)]
+
+# Correlation plot
+ggcorr(df, palette = "RdBu", label = TRUE)
+```
+
+
+**Here also, there is no kind od discrete pattern between Age and hours per week on the pairwise plot. And the correlation matrix plot also says there is no correlation between them. Thus, there is no relationship evident between them.**
+
+
+## Question 3
+
+### Automotive Data
+
+Consider the data set provided: Auto.csv that describes several aspects of many cars.
+
+1 Answer the following questions:
+
+#### Question 3 (a)
+
+(3 points) Which of the variables are quantitative and which are qualitative? (Use column names)
+
+```{r question3a}
+# reading the data from csv file
+auto_data <- read.csv("data/auto.csv")
+
+# removing missing values
+for(colname in colnames(auto_data)) {
+    auto_data <- auto_data[auto_data[colname] != "?", ]
+}
+
+head(auto_data)
+str(auto_data)
+
+# Horsepower is numeric
+auto_data$horsepower <- as.numeric(auto_data$horsepower)
+```
+
+
+### Quantitative variables
+
+* mpg
+* displacement
+* horsepower
+* weight
+* acceleration
+
+### Quanlitative variables
+
+* cylinders
+* year
+* origin
+* name
+
+#### Question 3 (b)
+
+(10 points) For each of the quantitative variables, calculate and report in a table the mean, median, mode, and range. For mode you will need to write your own function to perform the calculation.
+
+```{r question3b}
+
+# Subsetting the quantitative varibles
+quanti_auto_data <- auto_data[c("mpg", "displacement", "horsepower", "weight", "acceleration")]
+
+# custome function for finding mode and range
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+Range <- function(x) {
+    paste(min(x), max(x), sep = " | ")
+}
+
+# computing mean meadian mode range
+mean_list <- lapply(quanti_auto_data, mean)
+median_list <- lapply(quanti_auto_data, median)
+mode_list <- lapply(quanti_auto_data, Mode)
+range_list <- lapply(quanti_auto_data, Range)
+
+# forming the table
+cbind(Mean = mean_list, Median = median_list, Mode = mode_list, Range = range_list)
+```
+
+**For parts (c)-(e), only consider the variables displacement-DS and horsepower-HP.**
+
+#### Question 3 (c)
+
+(3 points) Calculate the first quartile, Q1, 37th, and 89th percentile of DS and HP.
+
+**Displacement**
+
+```{r question3c}
+# custome function for calculation
+cust_percentile <- function(data) {
+    percentiles <- quantile(data, c(0.25, 0.37, 0.89))
+    print(paste("First quartile is", percentiles[1], sep = " "))
+    print(paste("37th percentile is", percentiles[2], sep = " "))
+    print(paste("89th  percentile is", percentiles[3], sep = " "))
+}
+
+cust_percentile(quanti_auto_data$displacement)
+```
+
+**Horsepower**
+
+```{r question3c-2}
+cust_percentile(quanti_auto_data$horsepower)
+```
+
+
+#### Question 3 (d)
+
+(4 points) Present the five-number summary of DS and HP as a table.
+
+**Displacement**
+
+```{r question3d-1}
+summary(quanti_auto_data$displacement)
+```
+
+**Horsepower**
+
+```{r question3d-2}
+summary(quanti_auto_data$horsepower)
+```
+
+
+#### Question 3 (e)
+
+(4 points) Draw the box plots for DS and HP
+
+```{r question3e}
+# custom function to print stacked  
+# boxplot based on salary
+
+boxplot(auto_data$displacement, auto_data$horsepower, 
+        col = "grey", xlab = "Displacement & Horsepower",
+        ylab = "Value", xaxt = "n")
+```
+
+
+#### Question 3 (f)
+
+(6 points) Investigate the relationship among different variables using scatterplots and other graphics utilities. Describe any interesting relationships found.
+
+```{r question3f}
+ggpairs(auto_data[, -9], title = "Scatter plot of auto data")
+```
+
+From the graph it looks like the following relationship has strong positive correlation
+
+* Displacement vs cylinder
+* Displacement vs Weight
+* mpg vs year
+* mpg vs origin
+* Cylinder vs weight
+
+And the following has strong negative correlation
+
+* mpg vs Weight
+* mpg vs Displacement
+* mpg vs Cylinder
+* orgin vs Displacement
+* Weight vs Origin
+* Cylinder vs Horsepower
+
+#### Question 3 (g)
+
+(4 points) Let's say we want to predict mpg using the other variables. What other variables would be most useful in this prediction task. Why?
+
+It looks like mpg is continuous varible, thus using **regression analysis** would be a good option to predict it.
+
+If you see the above the graph where the scatterplot matrix shows the correlation of those values, it is evident that mpg has the following correlation with other variables.
+
+- Cylinder (-0.778)
+- displacement (-0.805)
+- horsepower (0.450)
+- weight (-0.832)
+- acceleration (0.423)
+- year (0.581)
+- origin (0.565)
+
+
+By setting the cut off value for the variable selection at .5. And year and origin have nearly very close correlation values. Thus, it doesn't have much of effect in reducing mean square error, thus it's better to any one of those.
+
+- Cylinder (-0.778)
+- displacement (-0.805)
+- weight (-0.832)
+- year (0.581)
+
+NOte: Though, here I have used correlation to do variable selection, inorder to have model which can have very less generalization error as possible, cross validation methodology has to be applied. This help us to identify the model which perform good on any data.
+
+```{r}
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(auto_data))
+
+## set the seed to make your partition reproductible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(auto_data)), size = smp_size)
+
+train <- auto_data[train_ind, ]
+test <- auto_data[-train_ind, ]
+
+# training the model
+model <- lm(mpg ~ cylinders + displacement +weight+year, data = train)
+summary(model)
+
+# crossvalidating
+# K-fold cross-validation
+cv.lm(test, model, 3) # 3 fold cross-validation
+```
+
+
+## Question 4
+
+### Sports Data
+
+The use of data analysis in sports is becoming increasing more common (and a high profit business). Interest in this analysis grew substantially with the publishing of the book Moneyball (and the subsequent movie). Statistical analysis has spread to many other sports including basketball, football (both American and soccer), tennis, and many others.
+
+#### Question 4 (a)
+
+**Tennis Data**
+
+For example, see the following articles on data analysis in tennis:
+
+* [James Murphy Shares Remixes Made With Tennis Data Album, Pitchfork](http://pitchfork.com/news/57887-james-murphy-shares-remixes-made-with-tennis-data-album/)
+* [Despite Advanced Stats, Tennis Has a Data Problem, Wall Street Journal](http://blogs.wsj.com/dailyfix/2013/09/07/despite-advanced-stats-tennis-has-a-data-problem/)
+* [Why Tennis So Far Behind Other Sports in Data Analytics?](http://www.forbes.com/forbes/welcome/?toURL=http://www.forbes.com/sites/jimpagels/2015/03/03/why-is-tennis-so-far-behind-other-sports-in-data-analytics/&refURL=&referrer=#1d87b1242831) , Forbes
+* [US Open 2015: Advanced Analytics in Tennis Takes a Minor Step Forward with IBM's SlamTracker,](http://www.ibtimes.com/us-open-2015-advanced-analytics-tennis-takes-minor-step-forward-ibms-slamtracker-2087873) IBTimes
+
+Recenting a crowd-sourcing solution has been used to chart tennis match statistics. This project Match Charting Project has seen growth in data collected to over 2500 matches. The data is housed at Github tennis MatchChartingProject. For this analysis, you will focus on some basic statistics that can be calculated from this data set. You will only need the files: charting-m-matches.csv, charting-m-stats-Overview.csv, charting-w-matches.csv, and charting-w-stats-Overview.csv
+
+Answer the following questions:
+
+i. (16 points) For both the Men's and Women's tours, consider only matches at the four Grand Slams:
+
+* Australian Open
+* French Open
+* Wimbledon
+* US Open
+
+from 2011 - present. List the top 5 men and women with the most Aces/match along with this value.
+
+
+```{r question4(reading the data)}
+# reading the data
+charting_m_matches <- read.csv("data/tennis_match_charting/charting-m-matches.csv")
+charting_m_stats_Overview <- read.csv("data/tennis_match_charting/charting-m-stats-Overview.csv")
+charting_w_matches <- read.csv("data/tennis_match_charting/charting-w-matches.csv")
+charting_w_stats_Overview <- read.csv("data/tennis_match_charting/charting-w-stats-Overview.csv")
+
+head(charting_m_matches)
+head(charting_m_stats_Overview)
+head(charting_w_matches)
+head(charting_w_stats_Overview)
+```
+
+
+#### Top 5 Men and women with most aces
+
+
+```{r question4a-i}
+# mentioned tour vector
+mentioned_tournaments <- c("Australian Open", "French Open", "Wimbledon", "US Open")
+
+# Function to get year
+get_year <- function(data) {
+    as.numeric(substring(data, 1, 4))
+}
+
+# function to get specified tour data after 2011
+prep_data <- function(matches_data, stats_data) {
+    mentioned_tour_matches <- matches_data[matches_data$Tournament == "Australian Open" | matches_data$Tournament == "French Open" | matches_data$Tournament == "Wimbledon" | matches_data$Tournament == "US Open",]
+    mentioned_tour_matches$year <- get_year(mentioned_tour_matches$Date)
+    matches_after_2011 <- mentioned_tour_matches[mentioned_tour_matches$year >= 2011, ]
+    merge(matches_after_2011, stats_data, by = "match_id")
+}
+
+
+# function to find top five
+top5_aces <- function(matches_data, stats_data) {
+    merged_data <- prep_data(matches_data, stats_data)
+    final_data <- aggregate(merged_data$aces, list(match_id = merged_data$match_id,
+                                    player1 = as.character(merged_data$Player.1),
+                                    player2 = as.character(merged_data$Player.2),
+                                    player = merged_data$player), mean)
+    final_data$player_name  <- ifelse(final_data$player == 1, final_data$player1, final_data$player2)
+    sorted_data <- final_data[order(final_data$x, decreasing = TRUE), ]
+    result <- sorted_data[1:5, c(6, 5)]
+    names(result) <- c("Player Name", "No. of Aces/Matches")
+    result
+}
+
+top5_aces(charting_m_matches, charting_m_stats_Overview)
+top5_aces(charting_w_matches, charting_w_stats_Overview)
+```
+
+
+
+ii. (16 points) For both the Men's and Women's tours in 2015, determine the top 5 men and women who have at least 5 matches charted with the highest break points saved percentage: Num. Break Points Saved / Num. of Break Points = bkptsbpsaved
+
+#### Top 5 Men and women with most Break point percent
+
+```{r question4a-ii}
+# function to get specified tour data after 2015 
+# with player those who p;ayed atleast 5 matches
+prep_data_2 <- function(matches_data, stats_data) {
+    matches_data$year <- get_year(matches_data$Date)
+    matches_2015 <- matches_data[matches_data$year == 2015, ]
+    player1 <- as.data.frame(table(matches_2015$Player.1))
+    player2 <- as.data.frame(table(matches_2015$Player.2))
+    binded_data <- rbind(player1, player2)
+    aggregate_data <- aggregate(binded_data$Freq, list(binded_data$Var1), sum)
+    player_matches <- aggregate_data[aggregate_data$x >= 5, ] 
+    players_morethan5 <- as.character(player_matches$Group.1)
+    matches_2015_atleast_5 <- matches_2015[matches_2015$Player.1 %in% players_morethan5 
+                                           | matches_2015$Player.2 %in% players_morethan5, ]
+    merge(matches_2015_atleast_5, stats_data, by = "match_id")
+}
+
+
+top5_bpsaved <- function(matches_data, stats_data) {
+    merged_data <- prep_data_2(matches_data, stats_data)
+    final_data <- aggregate(merged_data[, c("bp_saved", "bk_pts")], list(match_id = merged_data$match_id,
+                                        player1 = as.character(merged_data$Player.1),
+                                        player2 = as.character(merged_data$Player.2),
+                                        player = merged_data$player), sum)
+    final_data$player_name  <- ifelse(final_data$player == 1, final_data$player1, final_data$player2)
+    result <- aggregate(final_data[, c("bp_saved", "bk_pts")], list(player_name = final_data$player_name),
+                        sum)
+    result$bp_saved_percent <- (as.numeric(result$bp_saved) / as.numeric(result$bk_pts)) * 100
+    result <- result[order(-result$bp_saved_percent), c("player_name", "bp_saved_percent")]
+    names(result) <- c("Player Name", "Bp saved percent (out of 100%)")
+    result[1:5,]
+}
+
+top5_bpsaved(charting_m_matches, charting_m_stats_Overview)
+top5_bpsaved(charting_w_matches, charting_w_stats_Overview)
+```
+
+
+Other data sets exist charting similar information: [Github tennis slam pointbypoint.](https://github.com/JeffSackmann/tennis_slam_pointbypoint) 
+
+Tennis enthusiatics have even created challenges on data analysis and visualization [The Tennis Notebook - Storytelling Challenge](https://medium.com/the-tennis-notebook/tennis-data-storytelling-challenge-acf8a76558c8#.7l4mcutk9)
+
+
+#### Question 4 (b)
+
+(5 points (bonus)) Recreate one of the visualizations at [Tennis Visuals](http://tennisvisuals.com:8080/) using the data sets available above or create your own unique visualization of that tells a story about a match, a tournament, a career, a player, etc.
+
+Here I have used interactive visualization where I am showing the serve point based on each surface. It can be embedded in any web page and can be interacted.
+
+```{r question4b}
+men_merged_data <- merge(charting_m_matches, charting_m_stats_Overview, by = "match_id")
+women_merged_data <- merge(charting_w_matches, charting_w_stats_Overview, by = "match_id") 
+
+surface_stats <- function(surface, serve_pts, men) {
+    surface <- trimws(surface)
+    surface[surface == ""] <- "Blank"
+    surface[surface == "hard"] <- "Hard"
+    surface[surface == "Hard Court"] <- "Hard"
+    
+    p <- plot_ly(
+      x = surface,
+      y = serve_pts,
+      type = "bar"
+    ) %>% layout(title = paste("Serve points on each Surface", men, sep = " - "))
+    p
+}
+
+surface_stats(men_merged_data$Surface, men_merged_data$serve_pts, "Men")
+surface_stats(women_merged_data$Surface, women_merged_data$serve_pts, "Women")
+```
+
+
+
+** End of the assignment**
+
